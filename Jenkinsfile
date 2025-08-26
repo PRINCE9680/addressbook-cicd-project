@@ -1,34 +1,39 @@
 pipeline{
     agent any
+
+    tools {
+        maven 'maven3'
+    }
+    environment {
+        APP_NODE = 'ec2-user@54.165.139.224'
+    }
     stages{
-        stage('github validation'){
+        stage('Checkout code'){
           steps{
-                 git url: 'https://github.com/akshu20791/addressbook-cicd-project'
+                 git branch:'main', url: 'https://github.com/PRINCE9680/addressbook-cicd-project'
           }
         }
-        stage('compiling the code'){
+        stage('Build with maven'){
           steps{
-                 sh 'mvn compile'
+                 sh 'mvn clean package'
           }
         }
-        stage('testing the code'){
+        stage('Install tomcat using ansible'){
             steps{
-                sh 'mvn test'
-            }
-        }
-        stage('qa of the code'){
-            steps{
-                sh 'mvn pmd:pmd'
-            }
-        }
-        stage('package'){
-            steps{
-                sh 'mvn package'
+                sshagent(['app-node-ssh']){
+                    sh ''' 
+                        ansible-playbook -i inventory install_tomcat.yml
+                     '''
+                }
             }
         }
         stage("deploy the project on tomcat"){
             steps{
-                sh "sudo mv /var/lib/jenkins/workspace/pipeline/target/addressbook.war /home/ubuntu/apache-tomcat-8.5.100/webapps/"
+                sshagent(['app-node-ssh']){
+                    sh ''' 
+                        scp target/addressbook.war ec2-user@54.165.139.224:/opt/tomcat/webapps/
+                     '''
+                }
             }
         }
     }
